@@ -79,7 +79,7 @@ def calculate_metrics_clf(y_true, y_pred, subset_name):
 
 st.set_page_config(page_title="Aplicación Interactiva de Modelos de Clasificación ML", layout="wide")
 
-st.title("🤖 Evaluación de Modelos Predictivos de Clasificación")
+st.title("🤖 Modelos de Machine Learning - Clasificación")
 st.markdown("---")
 
 with st.sidebar:
