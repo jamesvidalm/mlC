@@ -22,7 +22,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-# from sklearn.neighbors import KNeighborsClassifier  <-- ELIMINADO
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -115,6 +114,12 @@ with st.sidebar:
 if selected_target in selected_features:
     st.error("❌ La variable Y no puede estar incluida en X.")
     st.stop()
+    
+# VERIFICACIÓN CRÍTICA: Asegurar que se seleccionó al menos una variable X
+if not selected_features:
+    st.error("🛑 Error: Debe seleccionar al menos una **Variable Independiente (X)** para entrenar el modelo.")
+    st.stop()
+
 
 # -------------------------------------------------
 # PREPROCESAMIENTO ESPECÍFICO PARA CLASIFICACIÓN
@@ -125,8 +130,10 @@ X_data = df[selected_features].copy()
 X_processed = pd.get_dummies(X_data, drop_first=True) 
 X = X_processed.values
 
+# 🛑 SOLUCIÓN AL PROBLEMA ACTUAL: Convertir X a float para que np.isnan funcione correctamente
+X = X.astype(np.float64) 
+
 # MANEJO DE VALORES FALTANTES (NaN) EN X
-# Aunque se quitó KNN, la imputación es una buena práctica general.
 if np.isnan(X).any():
     st.sidebar.warning("⚠️ Detectados y rellenados valores NaN en las características (X) usando la media.")
     imputer = SimpleImputer(missing_values=np.nan, strategy='mean')
@@ -158,7 +165,6 @@ with st.sidebar:
         "Regresión Logística": LogisticRegression,
         "Árbol de Decisión": DecisionTreeClassifier,
         "Random Forest": RandomForestClassifier,
-        # "K-Vecinos Cercanos (KNN)": KNeighborsClassifier, <-- ELIMINADO del menú
         "Máquinas de Soporte Vectorial (SVC)": SVC,
     }
 
@@ -173,8 +179,6 @@ with st.sidebar:
     if model_name == "Máquinas de Soporte Vectorial (SVC)":
         kernel = st.selectbox("Kernel:", ['rbf', 'linear', 'poly', 'sigmoid'])
         C = st.slider("Parámetro C:", 0.1, 10.0, 1.0)
-    
-    # Se eliminaron los parámetros específicos para KNN aquí
 
 
 if st.sidebar.button("✅ Entrenar Modelo"):
@@ -184,12 +188,10 @@ if st.sidebar.button("✅ Entrenar Modelo"):
     if model_name == "Random Forest":
         model = model_class(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
     elif model_name == "Máquinas de Soporte Vectorial (SVC)":
-        # Nota: SVC por defecto no tiene predict_proba, lo que afectará la Curva ROC si no se añade probability=True, pero lo dejamos simple.
         model = model_class(kernel=kernel, C=C, random_state=42)
     elif model_name == "Regresión Logística":
          model = model_class(max_iter=500, random_state=42)
     else:
-        # Aquí también se incluye DecisionTree y cualquier otro modelo simple
         model = model_class(random_state=42)
     
     # Entrenamiento
