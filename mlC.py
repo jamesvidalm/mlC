@@ -14,6 +14,7 @@ import csv
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import LabelEncoder
+from sklearn.impute import SimpleImputer 
 
 # Scikit-learn (Modelos de Clasificación)
 from sklearn.model_selection import train_test_split
@@ -21,7 +22,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
+# from sklearn.neighbors import KNeighborsClassifier  <-- ELIMINADO
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -79,7 +80,7 @@ def calculate_metrics_clf(y_true, y_pred, subset_name):
 
 st.set_page_config(page_title="Aplicación Interactiva de Modelos de Clasificación ML", layout="wide")
 
-st.title("🤖 Modelos de Machine Learning - Clasificación")
+st.title("🤖 Aplicación Interactiva de Modelos de Clasificación")
 st.markdown("---")
 
 with st.sidebar:
@@ -121,8 +122,16 @@ if selected_target in selected_features:
 
 # 1. Transformación de X: One-Hot Encoding para variables categóricas seleccionadas
 X_data = df[selected_features].copy()
-X_processed = pd.get_dummies(X_data, drop_first=True) # Codificación One-Hot
+X_processed = pd.get_dummies(X_data, drop_first=True) 
 X = X_processed.values
+
+# MANEJO DE VALORES FALTANTES (NaN) EN X
+# Aunque se quitó KNN, la imputación es una buena práctica general.
+if np.isnan(X).any():
+    st.sidebar.warning("⚠️ Detectados y rellenados valores NaN en las características (X) usando la media.")
+    imputer = SimpleImputer(missing_values=np.nan, strategy='mean')
+    X = imputer.fit_transform(X)
+
 
 # 2. Transformación de Y: Label Encoding para la variable objetivo (debe ser numérica)
 try:
@@ -149,7 +158,7 @@ with st.sidebar:
         "Regresión Logística": LogisticRegression,
         "Árbol de Decisión": DecisionTreeClassifier,
         "Random Forest": RandomForestClassifier,
-        "K-Vecinos Cercanos (KNN)": KNeighborsClassifier,
+        # "K-Vecinos Cercanos (KNN)": KNeighborsClassifier, <-- ELIMINADO del menú
         "Máquinas de Soporte Vectorial (SVC)": SVC,
     }
 
@@ -159,11 +168,13 @@ with st.sidebar:
     if model_name == "Random Forest":
         n_estimators = st.slider("N° de árboles:", 10, 300, 100)
         max_depth = st.slider("Profundidad máxima:", 2, 30, 10)
-
+    
     # Parámetros específicos para SVC
     if model_name == "Máquinas de Soporte Vectorial (SVC)":
         kernel = st.selectbox("Kernel:", ['rbf', 'linear', 'poly', 'sigmoid'])
         C = st.slider("Parámetro C:", 0.1, 10.0, 1.0)
+    
+    # Se eliminaron los parámetros específicos para KNN aquí
 
 
 if st.sidebar.button("✅ Entrenar Modelo"):
@@ -173,15 +184,14 @@ if st.sidebar.button("✅ Entrenar Modelo"):
     if model_name == "Random Forest":
         model = model_class(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
     elif model_name == "Máquinas de Soporte Vectorial (SVC)":
-        # SVC usa 'probabilidad=True' solo para calcular la curva ROC, pero es lento.
-        # Por simplicidad, lo usamos sin él y solo calculamos las métricas básicas.
+        # Nota: SVC por defecto no tiene predict_proba, lo que afectará la Curva ROC si no se añade probability=True, pero lo dejamos simple.
         model = model_class(kernel=kernel, C=C, random_state=42)
     elif model_name == "Regresión Logística":
-         # Ajustar max_iter para evitar advertencias de convergencia
          model = model_class(max_iter=500, random_state=42)
     else:
+        # Aquí también se incluye DecisionTree y cualquier otro modelo simple
         model = model_class(random_state=42)
-
+    
     # Entrenamiento
     model.fit(X_train, y_train)
 
@@ -206,7 +216,7 @@ if st.sidebar.button("✅ Entrenar Modelo"):
     # Presentación de Reporte de Clasificación (Entrenamiento y Validación)
     st.markdown("### 📋 Reporte de Clasificación")
     col_rep1, col_rep2 = st.columns(2)
-
+    
     with col_rep1:
         st.subheader("Entrenamiento")
         report_df_train = pd.DataFrame(metrics_train['Reporte_Clasificacion']).transpose()
@@ -216,13 +226,13 @@ if st.sidebar.button("✅ Entrenar Modelo"):
         st.subheader("Validación")
         report_df_test = pd.DataFrame(metrics_test['Reporte_Clasificacion']).transpose()
         st.dataframe(report_df_test.drop(columns=['support']).style.format('{:.2f}'))
-
+    
     # ---------------------------------------------
     # Gráficos: Matriz de Confusión
     # ---------------------------------------------
     st.header("📈 Matriz de Confusión")
     st.markdown("> La Matriz de Confusión muestra cuántas predicciones fueron correctas (diagonal principal) y cuántas incorrectas.")
-
+    
     col_cm1, col_cm2 = st.columns(2)
 
     # Matriz de Confusión (Entrenamiento)
@@ -248,21 +258,21 @@ if st.sidebar.button("✅ Entrenar Modelo"):
         ax_cm_test.set_xlabel('Valor Predicho')
         ax_cm_test.set_title("Matriz de Confusión - Validación")
         st.pyplot(fig_cm_test)
-
+        
     # Opcional: Curva ROC (solo para clasificación binaria y modelos con predict_proba)
     if len(class_names) == 2 and hasattr(model, "predict_proba"):
         st.header("📉 Curva ROC (Clasificación Binaria)")
-
+        
         # Predicciones de probabilidad
         y_score_train = model.predict_proba(X_train)[:, 1]
         y_score_test = model.predict_proba(X_test)[:, 1]
-
+        
         # Calcular ROC
         fpr_train, tpr_train, _ = roc_curve(y_train, y_score_train)
         roc_auc_train = auc(fpr_train, tpr_train)
         fpr_test, tpr_test, _ = roc_curve(y_test, y_score_test)
         roc_auc_test = auc(fpr_test, tpr_test)
-
+        
         # Gráfico ROC
         fig_roc, ax_roc = plt.subplots(figsize=(8, 6))
         ax_roc.plot(fpr_train, tpr_train, color='blue', lw=2, label=f'Entrenamiento (AUC = {roc_auc_train:.2f})')
